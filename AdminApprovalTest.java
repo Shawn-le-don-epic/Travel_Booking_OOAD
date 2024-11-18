@@ -1,7 +1,4 @@
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.Scanner;
 
 public class AdminApprovalTest {
@@ -10,20 +7,42 @@ public class AdminApprovalTest {
         Scanner sc = new Scanner(System.in);
 
         try {
-            // Display users pending admin approval
-            displayPendingApprovals();
+            while (true) {
+                System.out.println("\nAdmin Menu:");
+                System.out.println("1. Approve Users");
+                System.out.println("2. Define Available Trip Combinations");
+                System.out.println("3. Exit");
+                System.out.print("Enter your choice: ");
+                int choice = Integer.parseInt(sc.nextLine());
 
-            // Prompt admin to approve a user
-            System.out.print("Enter the username of the user to approve: ");
-            String username = sc.nextLine();
+                switch (choice) {
+                    case 1:
+                        // Approve users
+                        displayPendingApprovals();
+                        System.out.print("Enter the username of the user to approve: ");
+                        String username = sc.nextLine();
 
-            // Approve the selected user
-            boolean isApproved = userDAO.approveUser(username);
+                        boolean isApproved = userDAO.approveUser(username);
 
-            if (isApproved) {
-                System.out.println("User '" + username + "' approved successfully.");
-            } else {
-                System.out.println("Approval failed. User might not exist or is already approved.");
+                        if (isApproved) {
+                            System.out.println("User '" + username + "' approved successfully.");
+                        } else {
+                            System.out.println("Approval failed. User might not exist or is already approved.");
+                        }
+                        break;
+
+                    case 2:
+                        // Define trip combinations
+                        defineTripCombinations(sc);
+                        break;
+
+                    case 3:
+                        System.out.println("Exiting Admin Menu. Goodbye!");
+                        return;
+
+                    default:
+                        System.out.println("Invalid choice. Please try again.");
+                }
             }
         } catch (Exception e) {
             System.out.println("Error: " + e.getMessage());
@@ -33,12 +52,12 @@ public class AdminApprovalTest {
     }
 
     /**
-     * Display users whose accounts are pending admin approval.
+     * Display users pending admin approval.
      */
     private static void displayPendingApprovals() {
-        final String url = "jdbc:postgresql://localhost:5432/OOAD"; // Replace with your DB name
-        final String dbUsername = "postgres"; // Replace with your PostgreSQL username
-        final String dbPassword = "ShaAric@2024"; // Replace with your PostgreSQL password
+        final String url = "jdbc:postgresql://localhost:5432/OOAD";
+        final String dbUsername = "postgres";
+        final String dbPassword = "ShaAric@2024";
         String sql = "SELECT username, email FROM users WHERE status = false;";
 
         try (Connection con = DriverManager.getConnection(url, dbUsername, dbPassword);
@@ -61,6 +80,48 @@ public class AdminApprovalTest {
             }
         } catch (Exception e) {
             System.out.println("Database error while fetching pending approvals: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Allows admin to define available trip combinations.
+     */
+    private static void defineTripCombinations(Scanner sc) {
+        final String url = "jdbc:postgresql://localhost:5432/OOAD";
+        final String dbUsername = "postgres";
+        final String dbPassword = "ShaAric@2024";
+
+        try (Connection con = DriverManager.getConnection(url, dbUsername, dbPassword)) {
+            System.out.print("Enter trip source: ");
+            String source = sc.nextLine();
+
+            System.out.print("Enter trip destination: ");
+            String destination = sc.nextLine();
+
+            System.out.print("Enter mode of transport (e.g., Bus, Train, Flight): ");
+            String transportMode = sc.nextLine();
+
+            System.out.print("Enter available date (yyyy-mm-dd): ");
+            Date availableDate = Date.valueOf(sc.nextLine());
+
+            String sql = "INSERT INTO available_trips (source, destination, transport_mode, available_date) " +
+                    "VALUES (?, ?, ?, ?)";
+
+            try (PreparedStatement pst = con.prepareStatement(sql)) {
+                pst.setString(1, source);
+                pst.setString(2, destination);
+                pst.setString(3, transportMode);
+                pst.setDate(4, availableDate);
+
+                int rowsAffected = pst.executeUpdate();
+                if (rowsAffected > 0) {
+                    System.out.println("Trip combination added successfully.");
+                } else {
+                    System.out.println("Failed to add trip combination. Please try again.");
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("Error defining trip combinations: " + e.getMessage());
         }
     }
 }

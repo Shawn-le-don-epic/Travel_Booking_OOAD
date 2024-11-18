@@ -1,7 +1,4 @@
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.Statement;
+import java.sql.*;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Scanner;
@@ -151,7 +148,36 @@ public class Main {
     }*/
 
     private static void handleTripBooking(Scanner sc, TripDAO tripDAO, String username) {
-        try {
+        try (Connection con = DriverManager.getConnection(
+                "jdbc:postgresql://localhost:5432/OOAD", "postgres", "ShaAric@2024")) {
+
+            // Step 1: Display available trips
+            System.out.println("\nAvailable Trips:");
+            String sql = "SELECT * FROM available_trips ORDER BY available_date";
+            try (Statement st = con.createStatement();
+                 ResultSet rs = st.executeQuery(sql)) {
+
+                boolean tripsFound = false;
+                while (rs.next()) {
+                    tripsFound = true;
+                    int tripId = rs.getInt("trip_id");
+                    String source = rs.getString("source");
+                    String destination = rs.getString("destination");
+                    String transportMode = rs.getString("transport_mode");
+                    Date availableDate = rs.getDate("available_date");
+
+                    System.out.printf("Trip ID: %d | From: %s | To: %s | Mode: %s | Date: %s%n",
+                            tripId, source, destination, transportMode, availableDate);
+                }
+
+                if (!tripsFound) {
+                    System.out.println("No pre-defined trips available. You can create a custom trip.");
+                }
+            }
+
+            // Step 2: Booking logic
+            System.out.print("\nWould you like to book a listed trip (Y/N)? ");
+            String choice = sc.nextLine().trim().toUpperCase();
 
             int userId = getUserIdFromUsername(username);
             if (userId == -1) {
@@ -159,65 +185,75 @@ public class Main {
                 return;
             }
 
+            boolean isBooked = false;
+            int tripId = -1;
 
-            System.out.print("Enter trip source: ");
-            String source = sc.nextLine();
+            if (choice.equals("Y")) {
+                System.out.print("\nEnter the Trip ID you want to book: ");
+                int selectedTripId = Integer.parseInt(sc.nextLine());
+                isBooked = tripDAO.bookTripUsingAvailableTripId(username, selectedTripId);
+                tripId = selectedTripId;
+            } else {
+                return;
+                // Custom trip booking
+                /*
+                System.out.print("Enter trip source: ");
+                String source = sc.nextLine();
 
-            System.out.print("Enter trip destination: ");
-            String destination = sc.nextLine();
+                System.out.print("Enter trip destination: ");
+                String destination = sc.nextLine();
 
-            System.out.print("Enter mode of transport (e.g., Bus, Train, Flight): ");
-            String transportMode = sc.nextLine();
+                System.out.print("Enter mode of transport (e.g., Bus, Train, Flight): ");
+                String transportMode = sc.nextLine();
 
-            System.out.print("Enter departure date (yyyy-mm-dd): ");
-            LocalDate departureDate = LocalDate.parse(sc.nextLine());
+                System.out.print("Enter departure date (yyyy-mm-dd): ");
+                LocalDate departureDate = LocalDate.parse(sc.nextLine());
 
-            System.out.print("Do you need accommodation? (true/false): ");
-            boolean hasAccommodation = Boolean.parseBoolean(sc.nextLine());
+                System.out.print("Do you need accommodation? (true/false): ");
+                boolean hasAccommodation = Boolean.parseBoolean(sc.nextLine());
 
-            // Book the trip with status "Pending Payment"
-            boolean isBooked = tripDAO.bookTrip(username, source, destination, transportMode,
-                    java.sql.Date.valueOf(departureDate), null, hasAccommodation);
+                isBooked = tripDAO.bookTrip(username, source, destination, transportMode,
+                        java.sql.Date.valueOf(departureDate), null, hasAccommodation);
 
-            if (isBooked) {
+                if (isBooked) {
+                    tripId = tripDAO.getLatestTripIdForUserId(userId);
+                }*/
+            }
+
+            if (isBooked && tripId != -1) {
                 System.out.println("Trip booked successfully with status: 'Pending Payment'.");
 
-                // Fetch the trip ID of the newly booked trip
-                int tripId = tripDAO.getLatestTripIdForUserId(userId);
-                if (tripId != -1) {
-                    // Prompt for payment
-                    System.out.println("\nChoose payment method: UPI, Credit/Debit Card, Net Banking");
-                    String paymentMethod = sc.nextLine();
-                    Payment payment = new Payment(paymentMethod);
-                    boolean isPaymentSuccessful = payment.processPayment();
+                // Step 3: Payment processing
+                System.out.println("\nChoose payment method: UPI, Credit/Debit Card, Net Banking");
+                String paymentMethod = sc.nextLine();
+                Payment payment = new Payment(paymentMethod);
+                boolean isPaymentSuccessful = payment.processPayment();
 
-                    if (isPaymentSuccessful) {
-                        // Update trip status to "Confirmed"
-                        boolean isUpdated = tripDAO.updateTripStatus(tripId, "Confirmed");
-                        if (isUpdated) {
-                            System.out.println("Trip status updated to 'Confirmed'.");
-                        }
+                if (isPaymentSuccessful) {
+                    // Update trip status to "Confirmed"
+                    boolean isUpdated = tripDAO.updateTripStatus(tripId, "Confirmed");
+                    if (isUpdated) {
+                        System.out.println("Trip status updated to 'Confirmed'.");
+                    }
 
-                        // Insert payment details into 'payments' table
-                        boolean isPaymentInserted = tripDAO.insertPayment(tripId, paymentMethod, payment.getPaymentDetails());
-                        if (isPaymentInserted) {
-                            System.out.println("Payment recorded successfully!");
-                        } else {
-                            System.out.println("Error recording payment. Please contact support.");
-                        }
+                    // Insert payment details into 'payments' table
+                    boolean isPaymentInserted = tripDAO.insertPayment(tripId, paymentMethod, payment.getPaymentDetails());
+                    if (isPaymentInserted) {
+                        System.out.println("Payment recorded successfully!");
                     } else {
-                        System.out.println("Payment failed. Trip status remains 'Pending Payment'.");
+                        System.out.println("Error recording payment. Please contact support.");
                     }
                 } else {
-                    System.out.println("Error: Could not fetch trip details.");
+                    System.out.println("Payment failed. Trip status remains 'Pending Payment'.");
                 }
             } else {
-                System.out.println("Error booking trip. Please try again.");
+                System.out.println("Error booking trip. Please ensure the details are correct.");
             }
         } catch (Exception e) {
             System.out.println("Error during trip booking: " + e.getMessage());
         }
     }
+
 
 
     // Mock method to simulate fetching user ID from username

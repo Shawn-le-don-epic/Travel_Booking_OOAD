@@ -99,6 +99,27 @@ public class TripDAO {
         return false;
     }
 
+    public boolean bookTripUsingAvailableTripId(String username, int tripId) {
+        String sql = "INSERT INTO trips (user_id, source, destination, transport_mode, departure_date, status) " +
+                "SELECT u.user_id, a.source, a.destination, a.transport_mode, a.available_date, 'Pending Payment' " +
+                "FROM available_trips a, users u WHERE a.trip_id = ? AND u.username = ?";
+
+        try (Connection con = DriverManager.getConnection(url, this.username, this.password);
+             PreparedStatement pst = con.prepareStatement(sql)) {
+
+            pst.setInt(1, tripId);
+            pst.setString(2, username);
+
+            int rowsAffected = pst.executeUpdate();
+            return rowsAffected > 0;
+
+        } catch (Exception e) {
+            System.out.println("Error booking trip: " + e.getMessage());
+            return false;
+        }
+    }
+
+
 
 
 
